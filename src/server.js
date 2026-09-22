@@ -57,7 +57,13 @@ export function createServer({ preparationMs = 5000, log = console.log, now, sch
       return;
     }
 
-    const path = new URL(request.url, 'http://localhost').pathname;
+    let path;
+    try {
+      path = new URL(request.url, 'http://localhost').pathname;
+    } catch {
+      sendJson(response, 400, { error: 'Invalid request URL' });
+      return;
+    }
     if (path === '/status') {
       if (request.method !== 'GET') {
         sendJson(response, 405, { error: 'Method not allowed' }, { Allow: 'GET' });

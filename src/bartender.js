@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 
+export const MAX_PREPARATION_MS = 2_147_483_647;
+
 export function createBartender({ preparationMs, now = () => new Date(), schedule = setTimeout, createId = randomUUID }) {
-  if (!Number.isFinite(preparationMs) || preparationMs <= 0) {
-    throw new RangeError('preparationMs must be a positive number');
+  if (!Number.isInteger(preparationMs) || preparationMs < 1 || preparationMs > MAX_PREPARATION_MS) {
+    throw new RangeError(`preparationMs must be an integer between 1 and ${MAX_PREPARATION_MS}`);
   }
 
   const orders = new Map();

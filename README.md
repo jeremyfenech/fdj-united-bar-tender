@@ -27,7 +27,7 @@ Each accepted order has a server-generated `id`, which stays the same on retries
 
 ## Configuration and tests
 
-`PREPARATION_SECONDS` defaults to `5` and accepts a positive number. `PORT` defaults to `3000` and accepts an integer from 1 to 65535.
+`PREPARATION_SECONDS` defaults to `5`. It accepts 0.001 to 2,147,483.647 seconds in whole milliseconds; larger values exceed Node's single-timer range. `PORT` defaults to `3000` and accepts an integer from 1 to 65535.
 
 ```sh
 PREPARATION_SECONDS=1 PORT=3001 npm start

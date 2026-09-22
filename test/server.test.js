@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import net from 'node:net';
 import { after, before, test } from 'node:test';
 import { createServer } from '../src/server.js';
 
@@ -90,4 +91,20 @@ test('HTTP endpoints respond immediately, validate input, and audit every reques
   result = await request('/order', 'POST', 'x'.repeat(1024 * 1024 + 1));
   assert.equal(result.response.status, 413);
   assert.deepEqual(logs.at(-1).payload, { truncated: true, preview: 'x'.repeat(1024) });
+});
+
+test('malformed request target returns 400 without stopping the server', async () => {
+  const reply = await new Promise((resolve, reject) => {
+    const socket = net.connect(server.address().port, '127.0.0.1');
+    let data = '';
+    socket.on('connect', () => socket.write('GET http://[ HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n'));
+    socket.on('data', (chunk) => { data += chunk; });
+    socket.on('end', () => resolve(data));
+    socket.on('error', reject);
+  });
+  assert.match(reply, /^HTTP\/1\.1 400 Bad Request/);
+  assert.match(reply, /Invalid request URL/);
+  assert.equal(logs.at(-1).url, 'http://[');
+  const result = await request('/status');
+  assert.equal(result.response.status, 200);
 });

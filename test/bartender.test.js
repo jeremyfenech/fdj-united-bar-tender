@@ -93,3 +93,10 @@ test('reusing an idempotency key for a different payload is rejected', () => {
   assert.deepEqual(bartender.order('b', 'BEER', 'attempt-1'), { accepted: false, conflict: true });
   assert.equal(timers.length, 1);
 });
+
+test('preparation delay must fit Node timer precision and range', () => {
+  for (const preparationMs of [0, 0.5, 2_147_483_648, Infinity, NaN]) {
+    assert.throws(() => createBartender({ preparationMs }), /preparationMs must be an integer/);
+  }
+  assert.doesNotThrow(() => createBartender({ preparationMs: 2_147_483_647 }));
+});
