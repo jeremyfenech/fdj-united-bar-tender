@@ -1,4 +1,6 @@
-export function createBartender({ preparationMs, now = () => new Date(), schedule = setTimeout }) {
+import { randomUUID } from 'node:crypto';
+
+export function createBartender({ preparationMs, now = () => new Date(), schedule = setTimeout, createId = randomUUID }) {
   if (!Number.isFinite(preparationMs) || preparationMs <= 0) {
     throw new RangeError('preparationMs must be a positive number');
   }
@@ -9,10 +11,15 @@ export function createBartender({ preparationMs, now = () => new Date(), schedul
   let activeDrink = false;
 
   return {
-    order(customerId, drinkType) {
-      const key = JSON.stringify([customerId, drinkType]);
+    order(customerId, drinkType, idempotencyKey) {
+      const key = idempotencyKey === undefined
+        ? `legacy:${JSON.stringify([customerId, drinkType])}`
+        : `request:${idempotencyKey}`;
       const existing = orders.get(key);
       if (existing) {
+        if (existing.customerId !== customerId || existing.drinkType !== drinkType) {
+          return { accepted: false, conflict: true };
+        }
         return { accepted: true, duplicate: true, order: { ...existing } };
       }
 
@@ -20,7 +27,7 @@ export function createBartender({ preparationMs, now = () => new Date(), schedul
         return { accepted: false };
       }
 
-      const order = { customerId, drinkType, status: 'preparing', startedAt: now().toISOString() };
+      const order = { id: createId(), customerId, drinkType, status: 'preparing', startedAt: now().toISOString() };
       orders.set(key, order);
       if (drinkType === 'BEER') activeBeers += 1;
       else activeDrink = true;

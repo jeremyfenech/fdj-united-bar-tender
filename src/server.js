@@ -44,6 +44,7 @@ export function createServer({ preparationMs = 5000, log = console.log, now, sch
       method: request.method,
       url: request.url,
       payload,
+      idempotencyKey: request.headers['idempotency-key'] ?? null,
     }));
 
     if (bodyError) {
@@ -75,7 +76,18 @@ export function createServer({ preparationMs = 5000, log = console.log, now, sch
         return;
       }
 
-      const result = bartender.order(payload.customerId, payload.drinkType);
+      const idempotencyKey = request.headers['idempotency-key'];
+      if (idempotencyKey !== undefined && (typeof idempotencyKey !== 'string'
+        || !idempotencyKey.trim() || idempotencyKey.length > 255)) {
+        sendJson(response, 400, { error: 'Idempotency-Key must be a non-empty string of at most 255 characters' });
+        return;
+      }
+
+      const result = bartender.order(payload.customerId, payload.drinkType, idempotencyKey);
+      if (result.conflict) {
+        sendJson(response, 409, { error: 'Idempotency-Key was already used for a different order' });
+        return;
+      }
       if (!result.accepted) {
         sendJson(response, 429, { error: 'Bartender at capacity' });
         return;

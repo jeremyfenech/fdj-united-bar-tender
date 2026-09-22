@@ -21,10 +21,10 @@ after(async () => {
   await new Promise((resolve) => server.close(resolve));
 });
 
-async function request(path, method = 'GET', body) {
+async function request(path, method = 'GET', body, extraHeaders = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
-    headers: body === undefined ? undefined : { 'Content-Type': 'application/json' },
+    headers: { ...(body === undefined ? {} : { 'Content-Type': 'application/json' }), ...extraHeaders },
     body,
   });
   return { response, json: await response.json() };
@@ -67,4 +67,23 @@ test('HTTP endpoints respond immediately, validate input, and audit every reques
   result = await request('/status');
   assert.equal(result.json.servedOrders.length, 1);
   assert.deepEqual(result.json.uniqueCustomers, ['a']);
+
+  timers.shift()();
+  const body = JSON.stringify({ customerId: 'a', drinkType: 'BEER' });
+  result = await request('/order', 'POST', body, { 'Idempotency-Key': 'attempt-1' });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.json.duplicate, false);
+  const firstId = result.json.order.id;
+  result = await request('/order', 'POST', body, { 'Idempotency-Key': 'attempt-1' });
+  assert.equal(result.json.duplicate, true);
+  assert.equal(result.json.order.id, firstId);
+  result = await request('/order', 'POST', JSON.stringify({ customerId: 'a', drinkType: 'DRINK' }), { 'Idempotency-Key': 'attempt-1' });
+  assert.equal(result.response.status, 409);
+  timers.shift()();
+  result = await request('/order', 'POST', body, { 'Idempotency-Key': 'attempt-2' });
+  assert.equal(result.response.status, 200);
+  assert.equal(result.json.duplicate, false);
+  assert.notEqual(result.json.order.id, firstId);
+  result = await request('/order', 'POST', body, { 'Idempotency-Key': '' });
+  assert.equal(result.response.status, 400);
 });
