@@ -86,4 +86,8 @@ test('HTTP endpoints respond immediately, validate input, and audit every reques
   assert.notEqual(result.json.order.id, firstId);
   result = await request('/order', 'POST', body, { 'Idempotency-Key': '' });
   assert.equal(result.response.status, 400);
+
+  result = await request('/order', 'POST', 'x'.repeat(1024 * 1024 + 1));
+  assert.equal(result.response.status, 413);
+  assert.deepEqual(logs.at(-1).payload, { truncated: true, preview: 'x'.repeat(1024) });
 });

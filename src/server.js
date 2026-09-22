@@ -16,6 +16,7 @@ async function readBody(request) {
     if (bytes > MAX_BODY_BYTES) {
       const error = new Error('Request body exceeds 1 MiB');
       error.statusCode = 413;
+      error.payloadPreview = Buffer.concat([...chunks, chunk]).subarray(0, 1024).toString('utf8');
       throw error;
     }
     chunks.push(chunk);
@@ -36,7 +37,9 @@ export function createServer({ preparationMs = 5000, log = console.log, now, sch
       if (rawBody) payload = JSON.parse(rawBody);
     } catch (error) {
       bodyError = error;
-      payload = rawBody || null;
+      payload = error.statusCode === 413
+        ? { truncated: true, preview: error.payloadPreview }
+        : rawBody || null;
     }
 
     log(JSON.stringify({
